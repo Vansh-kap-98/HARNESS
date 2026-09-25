@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sourcemeta.example/schema-native/support-ticket.json",
+  "title": "Support ticket triage",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["department", "urgency", "refund_requested", "churn_risk"],
+  "properties": {
+    "department": {
+      "title": "Routing department",
+      "description": "Which team should own this ticket?",
+      "type": "string",
+      "oneOf": [
+        {"const": "billing", "description": "invoices, charges, refunds, payment methods"},
+        {"const": "technical", "description": "bugs, outages, errors, integration problems"},
+        {"const": "sales", "description": "pricing, upgrades, new seats, contracts"},
+        {"const": "other", "description": "anything that fits none of the above"}
+      ]
+    },
+    "urgency": {
+      "title": "Urgency",
+      "description": "How fast does this ticket need a human reply?",
+      "type": "string",
+      "enum": ["not_urgent", "soon", "critical"],
+      "x-ordered": true
+    },
+    "refund_requested": {
+      "title": "Refund requested",
+      "description": "Does the customer ask for money back (refund, chargeback, credit)?",
+      "type": "boolean"
+    },
+    "churn_risk": {
+      "title": "Churn risk",
+      "description": "Does the customer threaten to cancel, downgrade, or leave for a competitor?",
+      "type": "boolean"
+    }
+  }
+}

@@ -1,0 +1,3 @@
+{"id": "t001", "state": "charged twice for october, want one of them back today", "gold": {"department": "billing", "urgency": "soon", "refund_requested": true, "churn_risk": false}}
+{"id": "t002", "state": "api returns 503 on every call since the deploy, our checkout is down", "gold": {"department": "technical", "urgency": "critical", "refund_requested": false, "churn_risk": false}}
+{"id": "t003", "state": "third outage this month. cancel our contract and refund the quarter or we move to a competitor", "gold": {"department": "billing", "urgency": "critical", "refund_requested": true, "churn_risk": true}}

@@ -1,0 +1,5 @@
+# dev-only. python-jsonschema is a local convenience; its verdicts must never
+# enter results/ (PLAN.md section 4.3) -- Blaze via the sourcemeta jsonschema CLI decides.
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+pytest==9.1.1
