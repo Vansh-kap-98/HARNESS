@@ -138,10 +138,11 @@ def dict_probs(result):
         zip(["billing", "technical", "sales", "other"],
             answers["department"]["probabilities"])
     )
-    answers["urgency"]["probabilities"] = dict(
-        zip(["not_urgent", "soon", "critical"],
-            answers["urgency"]["probabilities"])
-    )
+    # a score keys its probabilities by stringified position, not by label
+    answers["urgency"]["probabilities"] = {
+        str(index): value
+        for index, value in enumerate(answers["urgency"]["probabilities"])
+    }
     return result
 
 
@@ -152,10 +153,35 @@ def test_probabilities_keyed_by_option_are_read_in_compiler_order(compiled):
     assert answers["department"].distribution == (0.91, 0.05, 0.03, 0.01)
 
 
-def test_a_keyed_score_is_read_by_its_criteria_labels(compiled):
+def test_a_score_keyed_by_position_is_read_in_order(compiled):
+    """What the package actually returns: {"0": .., "1": .., "2": ..}."""
     answers = to_answers(dict_probs(laya_result(urgency_probs=(0.7, 0.2, 0.1))), compiled)
     assert answers["urgency"].index == 0
     assert answers["urgency"].confidence == pytest.approx(0.7)
+    assert answers["urgency"].distribution == (0.7, 0.2, 0.1)
+
+
+def test_a_score_keyed_by_its_labels_is_also_accepted(compiled):
+    result = laya_result(urgency_probs=(0.1, 0.2, 0.7))
+    result["answers"]["urgency"]["probabilities"] = {
+        "not_urgent": 0.1, "soon": 0.2, "critical": 0.7
+    }
+    result["answers"]["department"]["probabilities"] = dict(
+        zip(["billing", "technical", "sales", "other"],
+            result["answers"]["department"]["probabilities"])
+    )
+    answers = to_answers(result, compiled)
+    assert answers["urgency"].index == 2
+
+
+def test_a_choice_keyed_by_position_is_also_accepted(compiled):
+    result = dict_probs(laya_result())
+    result["answers"]["department"]["probabilities"] = {
+        "0": 0.91, "1": 0.05, "2": 0.03, "3": 0.01
+    }
+    answers = to_answers(result, compiled)
+    assert answers["department"].index == 0
+    assert answers["department"].confidence == pytest.approx(0.91)
 
 
 def test_key_order_does_not_matter(compiled):
@@ -173,7 +199,7 @@ def test_keys_that_do_not_match_the_options_are_refused(compiled):
     result = dict_probs(laya_result())
     probs = result["answers"]["department"]["probabilities"]
     probs["marketing"] = probs.pop("sales")
-    with pytest.raises(LayaRunnerError, match="keys do not match the options"):
+    with pytest.raises(LayaRunnerError, match="match no shape we know"):
         to_answers(result, compiled)
 
 
