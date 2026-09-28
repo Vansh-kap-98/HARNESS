@@ -143,6 +143,28 @@ def test_gold_lands_in_every_position_roughly_evenly():
     assert max(counts) < total / 2, counts
 
 
+def test_instructions_can_be_set_per_corpus():
+    """Banking77 is intents, not API operations, so the wording has to change
+    -- and it has to reach both the question and the baseline's schema."""
+    text = "Which customer-service intent does this message express?"
+    built = build_question(examples(1)[0], catalogue(), 4, SEED, instructions=text)
+    assert built.question["instructions"] == text
+    schema = build_schema(built)
+    assert schema["properties"]["operation"]["description"] == text
+    compiled = compile_schema(schema)
+    assert compiled.questions["operation"]["instructions"] == text
+
+
+def test_build_sweep_passes_instructions_to_every_k():
+    text = "pick one"
+    sweep = build_sweep(examples(2), catalogue(), (4, 8), SEED, instructions=text)
+    assert all(
+        item.question["instructions"] == text
+        for items in sweep.values()
+        for item in items
+    )
+
+
 # --------------------------------------------------------------------------
 # agreement with the compiler
 # --------------------------------------------------------------------------

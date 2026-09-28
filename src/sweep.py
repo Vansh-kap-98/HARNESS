@@ -53,8 +53,11 @@ __all__ = [
 
 DEFAULT_KS: Tuple[int, ...] = (4, 8, 16, 32, 64, 128)
 
-# One blessed instruction string: it is part of the input, so changing it
-# between models or between k would break rule 8.
+# Default instruction text. It is part of the input, so it must be identical
+# across every model and every k within one comparison (rule 8), and recorded
+# in the run config. A different corpus needs different wording -- Banking77 is
+# customer-service intents, not API operations -- so it is a parameter rather
+# than a hard constant, but never one that varies inside a run.
 ROUTING_INSTRUCTIONS = (
     "Which API operation should be called to satisfy this request?"
 )
@@ -177,6 +180,7 @@ def build_question(
     catalogue: Sequence[Operation],
     k: int,
     seed: int,
+    instructions: str = ROUTING_INSTRUCTIONS,
 ) -> BuiltQuestion:
     """Render one example as a k-option `choice`.
 
@@ -221,7 +225,7 @@ def build_question(
     values = tuple(operation.id for operation in chosen)
     question = {
         "type": "choice",
-        "instructions": ROUTING_INSTRUCTIONS,
+        "instructions": instructions,
         "criteria": {operation.id: operation.description for operation in chosen},
     }
     return BuiltQuestion(
@@ -250,7 +254,7 @@ def build_schema(built: BuiltQuestion) -> Dict[str, Any]:
         "required": ["operation"],
         "properties": {
             "operation": {
-                "description": ROUTING_INSTRUCTIONS,
+                "description": built.question["instructions"],
                 "type": "string",
                 "oneOf": [
                     {"const": value, "description": criteria[value]}
@@ -266,6 +270,7 @@ def build_sweep(
     catalogue: Sequence[Operation],
     ks: Sequence[int] = DEFAULT_KS,
     seed: int = 0,
+    instructions: str = ROUTING_INSTRUCTIONS,
 ) -> Dict[int, List[BuiltQuestion]]:
     """Every example at every k, in input order."""
     if not ks:
@@ -273,7 +278,10 @@ def build_sweep(
     if len(set(ks)) != len(ks):
         raise SweepError("duplicate values of k: %s" % list(ks))
     return {
-        k: [build_question(example, catalogue, k, seed) for example in examples]
+        k: [
+            build_question(example, catalogue, k, seed, instructions)
+            for example in examples
+        ]
         for k in ks
     }
 
