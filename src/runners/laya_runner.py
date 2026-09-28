@@ -10,6 +10,10 @@ What the repo's own `rl_agent_api.py` returns, per question type:
     score  -> {"type", "score", "legend", "probabilities", "confidence", "rl_agent"}
     noul   -> {"type", "noul", "rl_agent"}          # the value IS p(yes)
 
+`probabilities` comes back keyed by option (a mapping), which is better than a
+bare list: it says which probability belongs to which option instead of leaving
+us to assume an order. A plain sequence is accepted too and read positionally.
+
 Two deliberate decisions:
 
 * **Confidence comes from `probabilities`, not from their `confidence` key.**
@@ -29,6 +33,7 @@ Anything this module cannot verify, it asserts at runtime and fails loudly on.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping as AbcMapping, Sequence as AbcSequence
 from typing import Any, Callable, Dict, List, Mapping, Tuple
 
 from src.assembler import Answer
@@ -89,9 +94,9 @@ def to_answers(
         values = compiled.specs[name].values
         qtype = question["type"]
         if qtype == "choice":
-            answers[name] = _from_choice(name, raw, values)
+            answers[name] = _from_choice(name, raw, question, values)
         elif qtype == "score":
-            answers[name] = _from_score(name, raw, values)
+            answers[name] = _from_score(name, raw, question, values)
         elif qtype == "noul":
             answers[name] = _from_noul(name, raw)
         else:  # pragma: no cover - the compiler emits no other type
@@ -117,9 +122,12 @@ def reported_confidence(
 
 
 def _from_choice(
-    name: str, raw: Mapping[str, Any], values: Tuple[Any, ...]
+    name: str,
+    raw: Mapping[str, Any],
+    question: Mapping[str, Any],
+    values: Tuple[Any, ...],
 ) -> Answer:
-    probabilities = _probabilities(name, raw, values)
+    probabilities = _aligned_probabilities(name, raw, question, values)
     index = max(range(len(probabilities)), key=lambda i: probabilities[i])
     chosen = raw.get("choice")
     if chosen is None:
@@ -145,9 +153,12 @@ def _from_choice(
 
 
 def _from_score(
-    name: str, raw: Mapping[str, Any], values: Tuple[Any, ...]
+    name: str,
+    raw: Mapping[str, Any],
+    question: Mapping[str, Any],
+    values: Tuple[Any, ...],
 ) -> Answer:
-    probabilities = _probabilities(name, raw, values)
+    probabilities = _aligned_probabilities(name, raw, question, values)
     index = max(range(len(probabilities)), key=lambda i: probabilities[i])
     return Answer(
         index=index,
@@ -178,9 +189,19 @@ def _from_noul(name: str, raw: Mapping[str, Any]) -> Answer:
     )
 
 
-def _probabilities(
-    name: str, raw: Mapping[str, Any], values: Tuple[Any, ...]
+def _aligned_probabilities(
+    name: str,
+    raw: Mapping[str, Any],
+    question: Mapping[str, Any],
+    values: Tuple[Any, ...],
 ) -> List[float]:
+    """Return the probabilities in the compiler's option order.
+
+    Laya keys them by option. `question["criteria"]` is a dict for `choice` and
+    a list for `score`, and iterating either gives the options in the order the
+    compiler laid them out -- the same order as `values`. A bare sequence is
+    read positionally instead.
+    """
     probabilities = raw.get("probabilities")
     if probabilities is None:
         raise LayaRunnerError(
@@ -188,10 +209,31 @@ def _probabilities(
             "`confidence` field is not a substitute (see module docstring)."
             % name
         )
+
+    option_keys = list(question["criteria"])
+    if isinstance(probabilities, AbcMapping):
+        missing = [key for key in option_keys if key not in probabilities]
+        extra = [key for key in probabilities if key not in option_keys]
+        if missing or extra:
+            raise LayaRunnerError(
+                "%r: `probabilities` keys do not match the options. Missing %s, "
+                "unexpected %s." % (name, missing[:3], extra[:3])
+            )
+        raw_values = [probabilities[key] for key in option_keys]
+    elif isinstance(probabilities, AbcSequence) and not isinstance(
+        probabilities, (str, bytes)
+    ):
+        raw_values = list(probabilities)
+    else:
+        raise LayaRunnerError(
+            "%r: `probabilities` is neither a mapping nor a sequence (got %s)"
+            % (name, type(probabilities).__name__)
+        )
+
     try:
-        numbers = [float(value) for value in probabilities]
+        numbers = [float(value) for value in raw_values]
     except (TypeError, ValueError):
-        raise LayaRunnerError("%r: `probabilities` is not a list of numbers" % name)
+        raise LayaRunnerError("%r: `probabilities` values are not numbers" % name)
     if len(numbers) != len(values):
         raise LayaRunnerError(
             "%r: %d probabilities for %d options. The option set the model saw "

@@ -127,6 +127,64 @@ def test_reported_confidence_is_kept_for_comparison(compiled):
 
 
 # --------------------------------------------------------------------------
+# probabilities keyed by option (what the package actually returns)
+# --------------------------------------------------------------------------
+
+
+def dict_probs(result):
+    """Rewrite the fake result the way the real package returns it."""
+    answers = result["answers"]
+    answers["department"]["probabilities"] = dict(
+        zip(["billing", "technical", "sales", "other"],
+            answers["department"]["probabilities"])
+    )
+    answers["urgency"]["probabilities"] = dict(
+        zip(["not_urgent", "soon", "critical"],
+            answers["urgency"]["probabilities"])
+    )
+    return result
+
+
+def test_probabilities_keyed_by_option_are_read_in_compiler_order(compiled):
+    answers = to_answers(dict_probs(laya_result()), compiled)
+    assert answers["department"].index == 0
+    assert answers["department"].confidence == pytest.approx(0.91)
+    assert answers["department"].distribution == (0.91, 0.05, 0.03, 0.01)
+
+
+def test_a_keyed_score_is_read_by_its_criteria_labels(compiled):
+    answers = to_answers(dict_probs(laya_result(urgency_probs=(0.7, 0.2, 0.1))), compiled)
+    assert answers["urgency"].index == 0
+    assert answers["urgency"].confidence == pytest.approx(0.7)
+
+
+def test_key_order_does_not_matter(compiled):
+    """A dict says which probability belongs to which option, so a different
+    insertion order must give the same answer."""
+    result = dict_probs(laya_result())
+    shuffled = dict(reversed(list(result["answers"]["department"]["probabilities"].items())))
+    result["answers"]["department"]["probabilities"] = shuffled
+    answers = to_answers(result, compiled)
+    assert answers["department"].index == 0
+    assert answers["department"].confidence == pytest.approx(0.91)
+
+
+def test_keys_that_do_not_match_the_options_are_refused(compiled):
+    result = dict_probs(laya_result())
+    probs = result["answers"]["department"]["probabilities"]
+    probs["marketing"] = probs.pop("sales")
+    with pytest.raises(LayaRunnerError, match="keys do not match the options"):
+        to_answers(result, compiled)
+
+
+def test_probabilities_of_an_unusable_type_are_refused(compiled):
+    result = laya_result()
+    result["answers"]["department"]["probabilities"] = 0.91
+    with pytest.raises(LayaRunnerError, match="neither a mapping nor a sequence"):
+        to_answers(result, compiled)
+
+
+# --------------------------------------------------------------------------
 # things that must fail loudly rather than score
 # --------------------------------------------------------------------------
 
