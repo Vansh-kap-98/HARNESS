@@ -212,8 +212,37 @@
 
   footer { padding-top: 26px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 12.5px; }
 
+  .themebtn {
+    position: fixed; top: 14px; right: 14px; z-index: 20;
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    letter-spacing: .07em; text-transform: uppercase;
+    color: var(--ink-2); background: var(--surface);
+    border: 1px solid var(--line-strong); border-radius: 999px;
+    padding: 6px 12px; cursor: pointer;
+    box-shadow: 0 1px 6px rgba(18, 22, 28, .10);
+  }
+  .themebtn:hover { color: var(--ink); border-color: var(--ink-3); }
+  .themebtn svg { width: 13px; height: 13px; display: block; }
+
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
+
+<script>
+  /* Stamp the theme before first paint so a dark OS never flashes through.
+     Light is the default; the viewer's choice is remembered per browser. */
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem("snt-theme"); } catch (err) { /* blocked storage */ }
+    document.documentElement.setAttribute("data-theme", saved === "dark" ? "dark" : "light");
+  })();
+</script>
+
+<button class="themebtn" id="themebtn" type="button" aria-label="Switch to dark theme">
+  <svg id="themeicon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" aria-hidden="true"></svg>
+  <span id="themelabel">Dark</span>
+</button>
 
 <div class="wrap">
 
@@ -419,6 +448,32 @@
     { k: 64, laya: 0.420, ll: 0.378, lh: 0.464, qwen: 0.266, ql: 0.229, qh: 0.306, tok: 656, over: true  },
     { k: 77, laya: 0.368, ll: 0.327, lh: 0.411, qwen: 0.230, ql: 0.195, qh: 0.269, tok: 783, over: true  }
   ];
+
+  /* ---- theme switch ---- */
+  var MOON = '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>';
+  var SUN = '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2' +
+            'M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4' +
+            'M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/>';
+
+  var themeBtn = document.getElementById("themebtn");
+  var themeIcon = document.getElementById("themeicon");
+  var themeLabel = document.getElementById("themelabel");
+
+  function applyTheme(mode) {
+    document.documentElement.setAttribute("data-theme", mode);
+    var goingDark = mode === "light";
+    themeIcon.innerHTML = goingDark ? MOON : SUN;
+    themeLabel.textContent = goingDark ? "Dark" : "Light";
+    themeBtn.setAttribute("aria-label",
+      goingDark ? "Switch to dark theme" : "Switch to light theme");
+    try { localStorage.setItem("snt-theme", mode); } catch (err) { /* blocked storage */ }
+  }
+
+  applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
+
+  themeBtn.addEventListener("click", function () {
+    applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  });
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
