@@ -1,0 +1,611 @@
+<title>Schema-Native Triage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f2f4f6;
+    --surface: #ffffff;
+    --surface-2: #e9edf1;
+    --ink: #12161c;
+    --ink-2: #4e5865;
+    --ink-3: #7c8794;
+    --line: #d9dfe6;
+    --line-strong: #b9c2cd;
+    --accent: #2a78d6;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --ok: #14784c;
+    --ok-bg: #e2f2ea;
+    --warn: #9a5800;
+    --warn-bg: #faeedb;
+    --shadow: 0 1px 2px rgba(18, 22, 28, .06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0e1116;
+      --surface: #161b22;
+      --surface-2: #1d232b;
+      --ink: #e9edf2;
+      --ink-2: #9ca7b5;
+      --ink-3: #6d7887;
+      --line: #262d37;
+      --line-strong: #39424f;
+      --accent: #3987e5;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --ok: #3fbd8a;
+      --ok-bg: #12291f;
+      --warn: #e0a33a;
+      --warn-bg: #2c2314;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0e1116;
+    --surface: #161b22;
+    --surface-2: #1d232b;
+    --ink: #e9edf2;
+    --ink-2: #9ca7b5;
+    --ink-3: #6d7887;
+    --line: #262d37;
+    --line-strong: #39424f;
+    --accent: #3987e5;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --ok: #3fbd8a;
+    --ok-bg: #12291f;
+    --warn: #e0a33a;
+    --warn-bg: #2c2314;
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    margin: 0;
+    padding-inline: 20px;
+    padding-block: 0 72px;
+  }
+  .wrap { max-width: 1020px; margin: 0 auto; }
+
+  h1, h2, h3 { font-family: Archivo, "IBM Plex Sans", system-ui, sans-serif; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(28px, 4.4vw, 40px); font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+  h2 { font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
+  h3 { font-size: 15px; font-weight: 600; }
+  p { margin: 0; max-width: 68ch; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  header.page { padding-block: 56px 36px; display: flex; flex-direction: column; gap: 14px; }
+  header.page p { color: var(--ink-2); font-size: 16px; }
+
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 0 26px;
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-3);
+    border-top: 1px solid var(--line); padding-top: 14px; margin-top: 6px;
+  }
+  .meta b { color: var(--ink-2); font-weight: 500; }
+
+  section { padding-block: 34px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 18px; }
+  .lede { color: var(--ink-2); }
+
+  /* ---- pipeline rail ---- */
+  .rail { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
+  .stage {
+    flex: 1 1 96px; min-width: 96px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 3px;
+    padding: 9px 10px; display: flex; flex-direction: column; gap: 3px;
+    box-shadow: var(--shadow);
+  }
+  .stage .n { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--ink-3); }
+  .stage .s { font-size: 13px; font-weight: 600; letter-spacing: -.01em; }
+  .stage .d { font-size: 11px; color: var(--ink-3); line-height: 1.35; }
+  .stage.ours { border-color: var(--accent); }
+  .stage.ours .s { color: var(--accent); }
+
+  /* ---- two-up ---- */
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow); }
+  .panel > .head {
+    padding: 10px 14px; border-bottom: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  }
+  .panel > .body { padding: 14px; }
+
+  .ticket { font-family: "IBM Plex Mono", monospace; font-size: 13px; line-height: 1.7; color: var(--ink); }
+
+  .q { padding: 11px 0; border-top: 1px solid var(--line); }
+  .q:first-child { border-top: 0; padding-top: 0; }
+  .q .top { display: flex; align-items: baseline; gap: 8px; }
+  .q .name { font-family: "IBM Plex Mono", monospace; font-size: 13px; font-weight: 500; }
+  .q .instr { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+  .q .crit { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-3); margin-top: 4px; word-break: break-word; }
+
+  .chip {
+    font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .06em;
+    text-transform: uppercase; padding: 2px 6px; border-radius: 2px;
+    border: 1px solid var(--line-strong); color: var(--ink-2); white-space: nowrap;
+  }
+  .chip.warn { color: var(--warn); background: var(--warn-bg); border-color: transparent; }
+  .chip.ok { color: var(--ok); background: var(--ok-bg); border-color: transparent; }
+
+  /* ---- answers ---- */
+  .answers { display: flex; flex-direction: column; }
+  .row { display: grid; grid-template-columns: 180px 1fr 120px; gap: 14px; align-items: center;
+         padding: 12px 0; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  @media (max-width: 680px) { .row { grid-template-columns: 1fr; gap: 6px; } }
+  .field { font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+  .field span { display: block; color: var(--ink-3); font-size: 11px; }
+  .val-inline { display: block; font-weight: 600; color: var(--ink); }
+  .val { font-weight: 600; }
+  .bar { position: relative; height: 8px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+  .bar i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 2px; transition: width .18s ease, background .18s ease; }
+  .row.esc .bar i { background: var(--warn); }
+  .num { font-family: "IBM Plex Mono", monospace; font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
+  @media (max-width: 680px) { .num { text-align: left; } }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 22px 32px; align-items: center; padding-top: 6px; }
+  .ctl { display: flex; flex-direction: column; gap: 6px; }
+  .ctl label { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+  input[type="range"] { width: 220px; accent-color: var(--accent); }
+  .seg { display: flex; border: 1px solid var(--line-strong); border-radius: 3px; overflow: hidden; }
+  .seg button {
+    font: inherit; font-size: 12.5px; padding: 5px 11px; border: 0; cursor: pointer;
+    background: var(--surface); color: var(--ink-2);
+  }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .note { font-size: 13px; color: var(--ink-2); border-left: 2px solid var(--line-strong); padding-left: 12px; }
+  .note b { color: var(--ink); font-weight: 600; }
+
+  /* ---- refusals ---- */
+  .refusals { display: flex; flex-direction: column; gap: 0; }
+  .refusal { display: grid; grid-template-columns: 210px 1fr; gap: 16px; padding: 11px 0; border-top: 1px solid var(--line); }
+  .refusal:first-child { border-top: 0; }
+  @media (max-width: 680px) { .refusal { grid-template-columns: 1fr; gap: 4px; } }
+  .refusal .k { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--ink); }
+  .refusal .r { font-size: 13px; color: var(--ink-2); }
+
+  /* ---- chart ---- */
+  .chartwrap { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 14px 6px 6px; box-shadow: var(--shadow); }
+  svg { display: block; width: 100%; height: auto; max-width: 100%; }
+  .legend { display: flex; gap: 20px; flex-wrap: wrap; padding: 0 12px 10px; }
+  .legend i { width: 18px; height: 3px; border-radius: 2px; display: inline-block; vertical-align: middle; margin-right: 7px; }
+  .legend span { font-size: 12.5px; color: var(--ink-2); }
+  .tip {
+    position: absolute; pointer-events: none; z-index: 5; opacity: 0; transition: opacity .12s;
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: 3px;
+    padding: 7px 9px; font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink);
+    box-shadow: 0 2px 10px rgba(0,0,0,.14); white-space: nowrap;
+  }
+  .chartpos { position: relative; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  .scroll { overflow-x: auto; }
+  th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; }
+  td { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+  tr.mark td { background: var(--surface-2); }
+
+  ul.plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; }
+  ul.plain li { color: var(--ink-2); font-size: 14px; max-width: 70ch; }
+  ul.plain li b { color: var(--ink); font-weight: 600; }
+
+  footer { padding-top: 26px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 12.5px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header class="page">
+  <div class="eyebrow">Decision track &middot; schema layer + evaluation harness</div>
+  <h1>A JSON Schema, answered in one forward pass</h1>
+  <p>A support-ticket schema is compiled into typed questions, answered by a 421M non-autoregressive
+     decision model, and reassembled into a validated instance. Every number below was measured by
+     this harness, not quoted from a model card.</p>
+  <div class="meta">
+    <div><b>Model</b> convaiinnovations/laya &middot; english &middot; zero-shot</div>
+    <div><b>Data</b> Banking77 test</div>
+    <div><b>n</b> 500 per k</div>
+    <div><b>Hardware</b> T4</div>
+  </div>
+</header>
+
+<section>
+  <div>
+    <div class="eyebrow">The pipeline</div>
+    <h2>Seven stages, two of which are ours</h2>
+  </div>
+  <p class="lede">The compiler and assembler are the shared JSON Schema layer. Everything else is an
+     existing tool, which is the point: the schema does the work of specifying the decision.</p>
+  <div class="rail">
+    <div class="stage"><div class="n">01</div><div class="s">Schema</div><div class="d">draft 2020-12, bundled</div></div>
+    <div class="stage ours"><div class="n">02</div><div class="s">Compiler</div><div class="d">properties &rarr; typed questions</div></div>
+    <div class="stage"><div class="n">03</div><div class="s">Questions</div><div class="d">choice / score / noul</div></div>
+    <div class="stage"><div class="n">04</div><div class="s">Model</div><div class="d">one forward pass</div></div>
+    <div class="stage ours"><div class="n">05</div><div class="s">Assembler</div><div class="d">answers &rarr; instance</div></div>
+    <div class="stage"><div class="n">06</div><div class="s">Instance</div><div class="d">JSON, confidence alongside</div></div>
+    <div class="stage"><div class="n">07</div><div class="s">Validation</div><div class="d">schema conformance</div></div>
+  </div>
+</section>
+
+<section>
+  <div>
+    <div class="eyebrow">Stages 01&ndash;04</div>
+    <h2>One real ticket, start to finish</h2>
+  </div>
+  <div class="two">
+    <div class="panel">
+      <div class="head"><h3>Input state</h3><span class="chip">text</span></div>
+      <div class="body"><p class="ticket">Hi, we were billed twice for March. Please refund the
+        duplicate today or we will cancel our plan and move to a competitor.</p></div>
+    </div>
+    <div class="panel">
+      <div class="head"><h3>Compiled questions</h3><span class="chip">4 of 4 fields</span></div>
+      <div class="body" id="questions"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div>
+    <div class="eyebrow">Stages 05&ndash;07</div>
+    <h2>The assembled instance</h2>
+  </div>
+  <p class="lede">Real output, captured from the run. Confidence is kept <em>alongside</em> the
+     instance, never inside it &mdash; an instance with a confidence field in it would not validate
+     against the schema it came from.</p>
+
+  <div class="panel">
+    <div class="head">
+      <h3>instance + per-field confidence</h3>
+      <span class="chip ok" id="validbadge">schema-valid</span>
+    </div>
+    <div class="body">
+      <div class="answers" id="answers"></div>
+      <div class="controls">
+        <div class="ctl">
+          <label for="thresh">Escalate below <span class="mono" id="threshval">0.70</span></label>
+          <input type="range" id="thresh" min="0" max="1" step="0.01" value="0.70">
+        </div>
+        <div class="ctl">
+          <label for="src-max">Confidence source</label>
+          <div class="seg" role="group">
+            <button id="src-max" type="button" aria-pressed="true">max probability</button>
+            <button id="src-laya" type="button" aria-pressed="false">model's own field</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note" id="srcnote"></div>
+  <div class="note"><b>On the badge:</b> validated with python-jsonschema, the development
+     fallback. Blaze via Sourcemeta's CLI is the authoritative engine and was not installed on the
+     run machine, so this verdict is marked non-authoritative in the harness and is excluded from
+     recorded results.</div>
+</section>
+
+<section>
+  <div>
+    <div class="eyebrow">Stage 02, the interesting half</div>
+    <h2>What the compiler refuses</h2>
+  </div>
+  <p class="lede">A decision model answers a fixed set of typed questions. Schema features that
+     cannot be one typed question are refused and routed, never approximated &mdash; the refusal
+     report is the schema layer's real output.</p>
+  <div class="panel"><div class="body refusals">
+    <div class="refusal"><div class="k">"type": "string"</div><div class="r">free-form text with no <code>enum</code> or <code>oneOf</code> of <code>const</code>s &rarr; generative track</div></div>
+    <div class="refusal"><div class="k">"minimum": 0, "maximum": 100</div><div class="r">101 steps, over the 10-step <code>score</code> limit</div></div>
+    <div class="refusal"><div class="k">"if" / "dependentSchemas"</div><div class="r">changes which properties exist, so there is no fixed question set &mdash; the whole schema is refused, not one field</div></div>
+    <div class="refusal"><div class="k">required &amp; unsupported</div><div class="r">no assembled instance could ever validate; the schema is out of scope rather than a bug to fix</div></div>
+  </div></div>
+</section>
+
+<section>
+  <div>
+    <div class="eyebrow">The measurement</div>
+    <h2>Where the decision model stops working</h2>
+  </div>
+  <p class="lede">Accuracy against the number of options, on Banking77 intents. Option sets are
+     nested &mdash; k=32 is exactly k=16 plus sixteen more &mdash; so a drop is attributable to the
+     option count and nothing else.</p>
+
+  <div class="chartwrap">
+    <div class="legend">
+      <span><i style="background:var(--series-1)"></i>Laya 421M &middot; decision</span>
+      <span><i style="background:var(--series-2)"></i>Qwen2.5 0.5B &middot; generative</span>
+      <span><i style="background:var(--line-strong)"></i>chance (1/k)</span>
+    </div>
+    <div class="chartpos">
+      <svg id="chart" viewBox="0 0 760 400" role="img"
+           aria-label="Accuracy against option count. Laya falls from 0.906 at 4 options to 0.368 at 77. Qwen falls from 0.404 to 0.230."></svg>
+      <div class="tip" id="tip"></div>
+    </div>
+  </div>
+
+  <div class="note"><b>The cliff is not the context filling up.</b> The largest drop, &minus;0.234
+     between 16 and 32 options, happens at 339 real tokens of a 512-token budget with nothing
+     truncated. The step that <em>does</em> overflow, 32&nbsp;&rarr;&nbsp;64, costs less than half
+     as much. Replicated across two distractor seeds: drops of 0.234 and 0.230.</div>
+
+  <div class="scroll"><table>
+    <thead><tr><th>k</th><th>Laya</th><th>95% Wilson</th><th>Qwen 0.5B</th><th>chance</th><th>tokens</th><th>truncated</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table></div>
+</section>
+
+<section>
+  <div>
+    <div class="eyebrow">Reading it</div>
+    <h2>What this does and does not show</h2>
+  </div>
+  <ul class="plain">
+    <li><b>The decision model wins at every k</b>, but the gap closes from 0.502 to 0.138, and that
+        is entirely Laya falling rather than the baseline improving.</li>
+    <li><b>The limit is discrimination, not context.</b> A larger context window would not move the
+        cliff. Fine-tuning might, which makes 16&nbsp;&rarr;&nbsp;32 the thing worth attacking.</li>
+    <li><b>So it goes after a retriever, not instead of one.</b> At a short option list it is
+        excellent; it cannot be the layer that searches a large API catalogue.</li>
+    <li><b>The baseline was not handicapped.</b> Options were ranked by summed log-probability,
+        which favours short labels &mdash; it does over-pick them, about 3&times; chance by k=16 &mdash;
+        but length-normalising recovers no accuracy, so the gap is real.</li>
+    <li><b>No latency claim belongs here.</b> The baseline scorer evaluates every option
+        exhaustively, so its wall-clock time is an artefact of the harness, not a property of the model.</li>
+    <li><b>Banking77 intents are a proxy for API operations.</b> Real API descriptions are more
+        confusable than banking intents, so the wall is likely lower, not higher.</li>
+    <li><b>Calibration is unreliable above ten options.</b> The checkpoint ships an out-of-range
+        temperature for its <code>choice:11+</code> bucket and the library itself prints
+        &ldquo;treat confidence from the affected entries as uncalibrated&rdquo;. Measured ECE at
+        k=77 is 0.497.</li>
+  </ul>
+</section>
+
+<footer>
+  Harness, schemas and recorded results: <span class="mono">Vansh-kap-98/HARNESS</span>.
+  Laya and Qwen figures are our own measurements; model-card claims are cited as self-reported and
+  were not reproduced.
+</footer>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var QUESTIONS = [
+    { name: "department", type: "choice", instr: "Which team should own this ticket?",
+      crit: "billing · technical · sales · other" },
+    { name: "urgency", type: "score", instr: "How fast does this ticket need a human reply?",
+      crit: "not_urgent → soon → critical" },
+    { name: "refund_requested", type: "noul", instr: "Does the customer ask for money back?",
+      crit: "calibrated yes / no" },
+    { name: "churn_risk", type: "noul", instr: "Does the customer threaten to cancel or leave?",
+      crit: "calibrated yes / no" }
+  ];
+
+  var ANSWERS = [
+    { field: "department", type: "choice", value: "\"billing\"", max: 0.9869, own: 0.9395 },
+    { field: "urgency", type: "score", value: "\"critical\"", max: 0.4119, own: 0.0145 },
+    { field: "refund_requested", type: "noul", value: "true", max: 0.9190, own: 0.9190 },
+    { field: "churn_risk", type: "noul", value: "true", max: 0.9398, own: 0.9398 }
+  ];
+
+  var SERIES = [
+    { k: 4,  laya: 0.906, ll: 0.877, lh: 0.929, qwen: 0.404, ql: 0.362, qh: 0.448, tok: 61,  over: false },
+    { k: 8,  laya: 0.850, ll: 0.816, lh: 0.879, qwen: 0.304, ql: 0.265, qh: 0.346, tok: 99,  over: false },
+    { k: 16, laya: 0.760, ll: 0.721, lh: 0.795, qwen: 0.258, ql: 0.222, qh: 0.298, tok: 179, over: false },
+    { k: 32, laya: 0.526, ll: 0.482, lh: 0.569, qwen: 0.286, ql: 0.248, qh: 0.327, tok: 339, over: false },
+    { k: 64, laya: 0.420, ll: 0.378, lh: 0.464, qwen: 0.266, ql: 0.229, qh: 0.306, tok: 656, over: true  },
+    { k: 77, laya: 0.368, ll: 0.327, lh: 0.411, qwen: 0.230, ql: 0.195, qh: 0.269, tok: 783, over: true  }
+  ];
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  /* ---- compiled questions ---- */
+  var qbox = document.getElementById("questions");
+  QUESTIONS.forEach(function (q) {
+    var row = el("div", "q");
+    var top = el("div", "top");
+    top.appendChild(el("span", "name", q.name));
+    top.appendChild(el("span", "chip", q.type));
+    row.appendChild(top);
+    row.appendChild(el("div", "instr", q.instr));
+    row.appendChild(el("div", "crit", q.crit));
+    qbox.appendChild(row);
+  });
+
+  /* ---- answers, threshold, source ---- */
+  var abox = document.getElementById("answers");
+  var rows = ANSWERS.map(function (a) {
+    var row = el("div", "row");
+    var f = el("div", "field");
+    f.appendChild(el("span", null, a.type));
+    f.appendChild(document.createTextNode(a.field));
+    var value = el("span", "val-inline");
+    value.textContent = a.value;
+    f.appendChild(value);
+    var barWrap = el("div", "bar");
+    var fill = el("i");
+    barWrap.appendChild(fill);
+    var num = el("div", "num");
+    row.appendChild(f);
+    row.appendChild(barWrap);
+    row.appendChild(num);
+    abox.appendChild(row);
+    return { node: row, fill: fill, num: num, data: a };
+  });
+
+  var source = "max";
+  var threshold = 0.70;
+  var threshEl = document.getElementById("thresh");
+  var threshVal = document.getElementById("threshval");
+  var srcNote = document.getElementById("srcnote");
+
+  function paint() {
+    rows.forEach(function (r) {
+      var c = source === "max" ? r.data.max : r.data.own;
+      r.fill.style.width = (c * 100).toFixed(1) + "%";
+      var esc = c < threshold;
+      r.node.classList.toggle("esc", esc);
+      r.num.textContent = "";
+      r.num.appendChild(document.createTextNode(c.toFixed(4) + " "));
+      if (esc) {
+        r.num.appendChild(el("span", "chip warn", "escalate"));
+      }
+    });
+    srcNote.innerHTML = source === "max"
+      ? "<b>Max probability</b> is the probability the model put on the option it chose. The harness uses this, because expected calibration error only means anything when the number compared against accuracy is the probability of the chosen answer."
+      : "<b>The model's own confidence field</b> is computed by <code>confidence_from_probs(p, k)</code> and is not the probability of the chosen option. For the <code>score</code> question it reads 0.0145 where the chosen level actually carried 0.4119 &mdash; a factor of 28. Anything computing calibration from this field on ordinal questions is measuring something else.";
+  }
+
+  threshEl.addEventListener("input", function () {
+    threshold = parseFloat(threshEl.value);
+    threshVal.textContent = threshold.toFixed(2);
+    paint();
+  });
+
+  var bMax = document.getElementById("src-max");
+  var bLaya = document.getElementById("src-laya");
+  bMax.addEventListener("click", function () {
+    source = "max"; bMax.setAttribute("aria-pressed", "true"); bLaya.setAttribute("aria-pressed", "false"); paint();
+  });
+  bLaya.addEventListener("click", function () {
+    source = "own"; bMax.setAttribute("aria-pressed", "false"); bLaya.setAttribute("aria-pressed", "true"); paint();
+  });
+
+  paint();
+
+  /* ---- table ---- */
+  var tb = document.getElementById("tbody");
+  SERIES.forEach(function (d) {
+    var tr = el("tr");
+    if (d.k === 32) tr.className = "mark";
+    [d.k, d.laya.toFixed(3), "[" + d.ll.toFixed(3) + ", " + d.lh.toFixed(3) + "]",
+     d.qwen.toFixed(3), (1 / d.k).toFixed(3), d.tok, d.over ? "yes" : "no"
+    ].forEach(function (cell, i) {
+      var td = el(i === 0 ? "th" : "td", null, String(cell));
+      if (i === 0) { td.scope = "row"; td.style.textAlign = "left"; }
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+
+  /* ---- chart ---- */
+  var svg = document.getElementById("chart");
+  var NS = "http://www.w3.org/2000/svg";
+  var W = 760, H = 400, L = 52, R = 150, T = 20, B = 46;
+  var x0 = Math.log2(4), x1 = Math.log2(77);
+
+  function X(k) { return L + (Math.log2(k) - x0) / (x1 - x0) * (W - L - R); }
+  function Y(v) { return T + (1 - v) * (H - T - B); }
+
+  function add(tag, attrs, text) {
+    var n = document.createElementNS(NS, tag);
+    for (var a in attrs) n.setAttribute(a, attrs[a]);
+    if (text !== undefined) n.textContent = text;
+    svg.appendChild(n);
+    return n;
+  }
+
+  [0, 0.25, 0.5, 0.75, 1].forEach(function (v) {
+    add("line", { x1: L, x2: W - R, y1: Y(v), y2: Y(v), stroke: "var(--line)", "stroke-width": 1 });
+    add("text", { x: L - 10, y: Y(v) + 4, "text-anchor": "end", fill: "var(--ink-3)",
+                  "font-size": 11, "font-family": "IBM Plex Mono, monospace" }, v.toFixed(2));
+  });
+
+  SERIES.forEach(function (d) {
+    add("text", { x: X(d.k), y: H - B + 20, "text-anchor": "middle", fill: "var(--ink-3)",
+                  "font-size": 11, "font-family": "IBM Plex Mono, monospace" }, String(d.k));
+  });
+  add("text", { x: (L + W - R) / 2, y: H - 8, "text-anchor": "middle", fill: "var(--ink-2)",
+                "font-size": 12 }, "number of options (k)");
+
+  /* overflow shading from k=64 */
+  add("rect", { x: X(64), y: T, width: (W - R) - X(64), height: H - T - B,
+                fill: "var(--line)", opacity: 0.35 });
+  add("text", { x: X(64) + 6, y: T + 14, fill: "var(--ink-3)", "font-size": 10.5,
+                "font-family": "IBM Plex Mono, monospace" }, "options exceed 512 tokens");
+
+  /* chance */
+  var chance = SERIES.map(function (d) { return X(d.k) + "," + Y(1 / d.k); }).join(" ");
+  add("polyline", { points: chance, fill: "none", stroke: "var(--line-strong)",
+                    "stroke-width": 2, "stroke-dasharray": "5 4" });
+
+  function drawSeries(key, lo, hi, color, label, dy) {
+    SERIES.forEach(function (d) {
+      add("line", { x1: X(d.k), x2: X(d.k), y1: Y(d[lo]), y2: Y(d[hi]),
+                    stroke: color, "stroke-width": 1.5, opacity: .5 });
+    });
+    var pts = SERIES.map(function (d) { return X(d.k) + "," + Y(d[key]); }).join(" ");
+    add("polyline", { points: pts, fill: "none", stroke: color, "stroke-width": 2,
+                      "stroke-linejoin": "round" });
+    SERIES.forEach(function (d) {
+      add("circle", { cx: X(d.k), cy: Y(d[key]), r: 4.5, fill: color,
+                      stroke: "var(--surface)", "stroke-width": 2 });
+    });
+    var last = SERIES[SERIES.length - 1];
+    add("text", { x: W - R + 12, y: Y(last[key]) + dy, fill: color, "font-size": 12.5,
+                  "font-weight": 600 }, label);
+    add("text", { x: W - R + 12, y: Y(last[key]) + dy + 15, fill: "var(--ink-3)", "font-size": 11,
+                  "font-family": "IBM Plex Mono, monospace" }, last[key].toFixed(3) + " at k=77");
+  }
+
+  drawSeries("laya", "ll", "lh", "var(--series-1)", "Laya 421M", -6);
+  drawSeries("qwen", "ql", "qh", "var(--series-2)", "Qwen 0.5B", -6);
+
+  /* cliff annotation */
+  var cx = (X(16) + X(32)) / 2;
+  add("line", { x1: X(16), x2: X(32), y1: Y(0.760), y2: Y(0.526),
+                stroke: "var(--series-1)", "stroke-width": 6, opacity: .18 });
+  add("text", { x: cx - 4, y: Y(0.64) - 6, "text-anchor": "end", fill: "var(--ink)",
+                "font-size": 12, "font-weight": 600 }, "− 0.234");
+  add("text", { x: cx - 4, y: Y(0.64) + 10, "text-anchor": "end", fill: "var(--ink-3)",
+                "font-size": 10.5, "font-family": "IBM Plex Mono, monospace" }, "nothing truncated");
+
+  /* hover layer */
+  var tip = document.getElementById("tip");
+  SERIES.forEach(function (d) {
+    var band = add("rect", { x: X(d.k) - 22, y: T, width: 44, height: H - T - B,
+                             fill: "transparent" });
+    band.style.cursor = "crosshair";
+    band.addEventListener("mouseenter", function () {
+      tip.innerHTML = "k = " + d.k + "<br>laya " + d.laya.toFixed(3) +
+                      "<br>qwen " + d.qwen.toFixed(3) +
+                      "<br>chance " + (1 / d.k).toFixed(3) +
+                      "<br>" + d.tok + " tokens";
+      tip.style.opacity = "1";
+      var box = svg.getBoundingClientRect();
+      var px = X(d.k) / W * box.width;
+      tip.style.left = Math.min(box.width - 130, px + 12) + "px";
+      tip.style.top = (Y(d.laya) / H * box.height) + "px";
+    });
+    band.addEventListener("mouseleave", function () { tip.style.opacity = "0"; });
+  });
+})();
+</script>

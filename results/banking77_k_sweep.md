@@ -73,13 +73,59 @@ temperature for `choice:11+` is out of range and gets clamped. Every k from 16
 up is in that bucket, so these confidences are uncalibrated by the library's own
 admission — and that is precisely the many-option regime routing lives in.
 
-## What this does NOT show
+## Baseline: Qwen2.5-0.5B-Instruct, same examples, same k
 
-There is **no baseline line yet**. "Accuracy falls as options multiply" is
-expected and proves nothing on its own. The claim worth testing is whether a
-small generative LLM degrades more slowly than a 421M decision model, at the
-same k, on the same examples. Until that line exists, this is one curve, not a
-comparison.
+Scored by picking the option with the highest total log-probability as a
+continuation of a prompt listing all k options. For a closed set this is
+*stronger* than grammar-constrained greedy decoding, which picks token by token
+and can walk into a suboptimal option — so the baseline gets the better version
+of the task.
+
+| k | Laya 421M | Qwen 0.5B | gap | chance |
+|---|---|---|---|---|
+| 4 | 0.906 [0.877, 0.929] | 0.404 [0.362, 0.448] | 0.502 | 0.250 |
+| 8 | 0.850 [0.816, 0.879] | 0.304 [0.265, 0.346] | 0.546 | 0.125 |
+| 16 | 0.760 [0.721, 0.795] | 0.258 [0.222, 0.298] | 0.502 | 0.063 |
+| 32 | 0.526 [0.482, 0.569] | 0.286 [0.248, 0.327] | 0.240 | 0.031 |
+| 64 | 0.420 [0.378, 0.464] | 0.266 [0.229, 0.306] | 0.154 | 0.016 |
+| 77 | 0.368 [0.327, 0.411] | 0.230 [0.195, 0.269] | 0.138 | 0.013 |
+
+**The decision model wins at every k, and its lead collapses.** Laya falls 0.538
+across the range; Qwen falls 0.174. The convergence is driven entirely by Laya
+degrading, not by the baseline improving. Whether the lines cross beyond k=77 is
+not licensed by this data.
+
+Qwen is non-monotonic between k=16 and k=32 (0.258 → 0.286), within overlapping
+intervals, so consistent with noise at n=500.
+
+### Length bias: measured, and it changes nothing
+
+Options are ranked by *unnormalised* summed log-probability, which favours short
+strings, and Banking77 labels run from `card_arrival` to
+`verify_source_of_funds`. Re-scored both ways from the same forward passes
+(Kaggle, T4, same examples and seed):
+
+| k | summed | length-normalised | picked a shortest option | chance |
+|---|---|---|---|---|
+| 4 | 0.404 [0.362, 0.448] | 0.390 [0.348, 0.433] | 34.4% | 25.0% |
+| 8 | 0.304 [0.265, 0.346] | 0.308 [0.269, 0.350] | 24.0% | 12.5% |
+| 16 | 0.258 [0.222, 0.298] | 0.240 [0.205, 0.279] | 18.6% | 6.2% |
+
+The bias is real: the summed scorer picks a shortest option about 3x chance by
+k=16. But normalising recovers no accuracy — every pair of intervals overlaps
+heavily and two of the three move slightly the wrong way. The short options it
+over-picks were not costing it correct answers.
+
+**So the baseline was not handicapped by the scoring choice.** Qwen-0.5B's
+weakness on this task is genuine, and the gap to Laya stands as measured.
+
+### One caveat that remains
+
+**No latency comparison may be drawn from this run.** The baseline scorer
+   does k chunked forward passes per example (43 minutes for 500 examples at
+   k=77, against roughly 25 seconds for Laya). That is an artefact of scoring
+   every option exhaustively, not a property of the model. A latency claim needs
+   single-pass constrained decoding and the §6 protocol.
 
 Banking77 intents are also a proxy for API operations: real API descriptions are
 more confusable than banking intents, so the real wall is likely lower, not
