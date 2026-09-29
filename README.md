@@ -4,7 +4,16 @@ A JSON Schema is compiled into typed decision questions (`choice` / `score` / `n
 a small non-autoregressive decision model in one forward pass, then reassembled into a JSON
 instance and validated with Blaze.
 
-Read [PLAN.md](PLAN.md) first. It is the master plan and the list of things that are banned.
+**Demo:** <https://vansh-kap-98.github.io/HARNESS/demo/> — the pipeline on a real ticket, and
+the measured curve.
+**Results:** [results/banking77_k_sweep.md](results/banking77_k_sweep.md) — every number, with the
+config that produced it.
+
+Headline finding: a 421M decision model beats a 0.5B generative baseline at every option count
+tested, but loses 0.234 accuracy between 16 and 32 options — **at 339 tokens of a 512-token budget,
+with nothing truncated.** The wall is discrimination, not context.
+
+Read [PLAN.md](PLAN.md) for the plan, the open questions, and the list of things that are banned.
 
 ```
 schema -> bundle $refs -> compiler -> typed questions -> model -> answers -> assembler -> instance -> Blaze

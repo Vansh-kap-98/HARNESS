@@ -292,15 +292,41 @@ Local commands:
 
 ## 10. Current state
 
-**Done — 180 tests passing, 1 skipped (the real-Blaze test, which needs the CLI installed)**
+**Demo:** <https://vansh-kap-98.github.io/HARNESS/demo/>
+**Results:** [`results/banking77_k_sweep.md`](results/banking77_k_sweep.md)
 
-- `src/compiler.py` — schema to questions, two-level refusals, `$ref` resolution.
-- `src/assembler.py` — canonical `Answer` type, instance building, escalation with no default threshold.
-- `src/validate.py` — Blaze via the CLI, functional probe against the name collision, non-authoritative dev fallback.
-- `src/dataset.py` — JSONL loading, gold checked against the compiled answer space, label distribution, sha256 freeze.
-- `src/score.py` — Wilson intervals, per-field and exact-match accuracy, majority-class floor, ECE with a reportability gate, latency aggregation, size caveats.
-- `tests/test_end_to_end.py` — the whole pipeline on 3 fixture records with a stub model.
-- `.venv` (3.12), `conftest.py`, `requirements-dev.txt`.
+### Measured (first real results)
+
+Banking77, 500 examples per k, nested option sets, Laya english checkpoint
+zero-shot against Qwen2.5-0.5B-Instruct. Reproduced identically on Colab and
+Kaggle from the same seeds.
+
+1. **The option wall is a discrimination limit, not a context limit.** Accuracy
+   falls 0.234 between k=16 and k=32 at 339 real tokens of a 512-token budget
+   with nothing truncated. The step that *does* overflow, 32→64, costs less than
+   half as much. Replicated across two distractor seeds (0.234, 0.230).
+2. **The decision model beats the generative baseline at every k, and its lead
+   collapses** — 0.502 at k=4 down to 0.138 at k=77, entirely because Laya falls
+   rather than Qwen improving. The baseline was checked for length bias and was
+   not handicapped.
+3. **Calibration is unreliable in the regime routing needs.** The checkpoint
+   ships an out-of-range temperature for its `choice:11+` bucket; the library
+   clamps it and prints "treat confidence from the affected entries as
+   uncalibrated". Measured ECE at k=77 is 0.497.
+4. **`MAX_CHOICE_OPTIONS = 20` is right for the wrong reason.** It was derived
+   from token arithmetic, which the data says is irrelevant; keep the number,
+   replace the justification.
+
+### Built — 247 tests passing, 1 skipped (real-Blaze, needs the CLI installed)
+
+- `src/compiler.py`, `src/assembler.py`, `src/validate.py`, `src/dataset.py`,
+  `src/score.py` — the schema layer and the metrics.
+- `src/sweep.py` — routing questions at each k, nested sets, independent
+  selection and display permutations, chance-level accounting.
+- `src/runners/laya_runner.py` — adapts Laya's output to the canonical `Answer`;
+  refuses rather than scores when the shapes disagree.
+- `notebooks/colab_banking77_sweep.ipynb` — the whole run, Kaggle or Colab.
+- `demo/index.html` — the pipeline and the curve, published.
 
 **Blocked on someone else**
 
@@ -308,9 +334,12 @@ Local commands:
 2. The success metric — Hari.
 3. Sourcemeta `jsonschema` CLI installed, so validation stops being stubbed.
 
-**Next, in order**
+### Next
 
-1. Write and freeze `data/smoke/tickets.jsonl` (50 real messy tickets, 20% hand-checked, sha256 recorded). Must not be written by a model that then gets scored on it.
-2. `src/runners/laya_runner.py` — only after the real Laya API is read from the installed package, not guessed.
-3. `src/runners/llm_runner.py` — same, for the installed Outlines or XGrammar version.
-4. `notebooks/smoke_test.ipynb`, then the first run into `results/`.
+1. **Fine-tune and re-measure the same curve.** Does the 16→32 cliff move? Laya's
+   card links a fine-tuning notebook that runs on Kaggle's free 2×T4. This is the
+   experiment that decides whether the wall is architectural or trainable, and it
+   is the first thing in this project that needs a parameter budget.
+2. Extend the baseline to Qwen2.5-1.5B and 7B for a within-family slope.
+3. A real API-operation corpus (MCP `tools/list` output) to replace Banking77 as
+   the proxy.
