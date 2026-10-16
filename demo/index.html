@@ -308,7 +308,7 @@
   <div class="panel">
     <div class="head">
       <h3>instance + per-field confidence</h3>
-      <span class="chip ok" id="validbadge">schema-valid</span>
+      <span class="chip" id="validbadge">schema-valid &middot; dev engine, non-authoritative</span>
     </div>
     <div class="body">
       <div class="answers" id="answers"></div>
@@ -373,10 +373,18 @@
     </div>
   </div>
 
-  <div class="note"><b>The cliff is not the context filling up.</b> The largest drop, &minus;0.234
-     between 16 and 32 options, happens at 339 real tokens of a 512-token budget with nothing
-     truncated. The step that <em>does</em> overflow, 32&nbsp;&rarr;&nbsp;64, costs less than half
-     as much. Replicated across two distractor seeds: drops of 0.234 and 0.230.</div>
+  <div class="note"><b>The cliff is a token budget, not a context limit.</b> The options share a
+     192-token budget, so each gets about <code>192/k</code>. Past k&asymp;20 that is less than a
+     label needs and they are cut mid-word &mdash; <code>card_not_working</code> becomes
+     <code>card_not_</code> &mdash; until five of the 32 options are byte-identical strings.
+     Raising the budget to 384 lifts k=32 from 0.526 to <b>0.660</b>, intervals disjoint. The
+     sequence never exceeds 325 tokens of a 512 context, and every option is scored, so neither
+     of those is the constraint.</div>
+
+  <div class="note"><b>Tokens per option is the controlling variable.</b> 12 tokens per option
+     gives 0.760 at k=16 and 0.660 at k=32; 6 tokens gives 0.526 at k=32 and 0.406 at k=64. So the
+     &minus;0.234 cliff is <b>&minus;0.134 budget artefact and &minus;0.100 genuine discrimination
+     cost</b>. The usable option count is <code>head_max_len / 12</code>, not a fixed number.</div>
 
   <div class="scroll"><table>
     <thead><tr><th>k</th><th>Laya</th><th>95% Wilson</th><th>Qwen 0.5B</th><th>chance</th><th>tokens</th><th>truncated</th></tr></thead>
@@ -392,8 +400,9 @@
   <ul class="plain">
     <li><b>The decision model wins at every k</b>, but the gap closes from 0.502 to 0.138, and that
         is entirely Laya falling rather than the baseline improving.</li>
-    <li><b>The limit is discrimination, not context.</b> A larger context window would not move the
-        cliff. Fine-tuning might, which makes 16&nbsp;&rarr;&nbsp;32 the thing worth attacking.</li>
+    <li><b>Most of the cliff is configuration, not capability.</b> Doubling the per-option token
+        budget recovers 0.134 of the 0.234 drop without touching the model. Raise the budget
+        before reaching for fine-tuning.</li>
     <li><b>So it goes after a retriever, not instead of one.</b> At a short option list it is
         excellent; it cannot be the layer that searches a large API catalogue.</li>
     <li><b>The baseline was not handicapped.</b> Options were ranked by summed log-probability,
